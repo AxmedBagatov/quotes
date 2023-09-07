@@ -1,0 +1,57 @@
+import os
+from gtts import gTTS
+from moviepy.editor import *
+
+# Путь к текстовому файлу с цитатами
+input_quotes_file = "quotes.txt"
+
+# Папка для сохранения аудиофайлов
+audio_folder = "temp_audio"
+
+#
+# Параметры видео
+video_duration = 10  # длительность одного видео (сек)
+video_resolution = (1280, 720)  # разрешение видео
+font_size = 40
+
+def create_quote_video(quote_text, author):
+    # Создаем текстовый клип с цитатой и автором
+    txt_clip = TextClip(quote_text, fontsize=font_size, color='white', size=video_resolution, method='caption')
+    author_clip = TextClip(author, fontsize=font_size, color='white', size=video_resolution, method='caption')
+
+    # Выравниваем текст по центру внизу
+    txt_clip = txt_clip.set_position(('center', 'center'))
+    author_clip = author_clip.set_position(('center', 'bottom')).set_duration(video_duration)
+
+    # Создаем аудио для цитаты
+    if not os.path.exists(audio_folder):
+        os.makedirs(audio_folder)
+
+    sanitized_author = author.replace(" ", "_").replace(",", "").replace(".", "")
+    audio_path = os.path.join(audio_folder, f"{sanitized_author}.mp3")
+
+    if not os.path.exists(audio_path):
+        tts = gTTS(quote_text, lang='ru')
+        tts.save(audio_path)
+
+    audio_clip = AudioFileClip(audio_path)
+    min_duration = min(video_duration, audio_clip.duration)
+
+    audio = audio_clip.subclip(0, min_duration)
+    audio = audio.set_duration(min_duration)
+
+    # Создаем видеоклип с текстом, автором и аудио
+    video = CompositeVideoClip([txt_clip, author_clip]).set_duration(video_duration).set_audio(audio)
+    return video
+
+video_clips = []
+
+with open(input_quotes_file, "r", encoding="utf-8") as file:
+    for line in file:
+        quote, author = line.strip().split(" - ")
+        video_clips.append(create_quote_video(quote, author))
+
+final_video = concatenate_videoclips(video_clips, method="compose")
+
+output_video_path = "output_video.mp4"
+final_video.write_videofile(output_video_path, fps=24)
